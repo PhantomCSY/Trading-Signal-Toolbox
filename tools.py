@@ -4,18 +4,18 @@ import pandas as pd
 # 回测函数, asset_value输入标的价格序列，position输入仓位序列，cost输入交易费用
 def back_test(asset_value, position, cost):
     w = 0
-    value = [asset_value[0]]
+    strategy_value = [asset_value[0]]
     
     for i in range(len(asset_value)):
         if i == 0:
-            value[0] = value[0] * (1 - position[i] * cost)
+            strategy_value[0] = strategy_value[0] * (1 - position[i] * cost)
         else:
             daily_return = (asset_value[i] / asset_value[i-1] - 1) * w
             daily_cost = abs(position[i] - position[i-1]) * cost
-            value.append(value[-1] * (1 + daily_return) * (1 - daily_cost))
+            strategy_value.append(strategy_value[-1] * (1 + daily_return) * (1 - daily_cost))
         w = position[i]
         
-    return value
+    return strategy_value
    
     
 # 将Position序列转换为交易信号[1 - 0 -1]signal序列
@@ -39,8 +39,9 @@ def position2signal(position):
     
     
 # 指标评价函数，asset_value须包括收盘、最低、最高价，position是0-1信号，period是评价周期
-def evaluate_signal(asset_value, value, signal, position, period):
-    value = np.asarray(value)
+def evaluate_signal(asset_value, strategy_value, signal, position, period):
+    strategy_value = np.asarray(strategy_value)
+    signal = position2signal(position)
     # 最大不利变动，最大有利变动
     MAE, MFE = [], []
     # 每次交易持有时间，每次盈利利润，每次亏损利润，当日历史最大回撤
@@ -81,8 +82,8 @@ def evaluate_signal(asset_value, value, signal, position, period):
                 losses.append(-gain)
                 
         # 记录当日历史最大回撤
-        max_value = max(value[:i+1])
-        drowndown.append( 1 - value[i]/max_value )
+        max_value = max(strategy_value[:i+1])
+        drowndown.append( 1 - strategy_value[i]/max_value )
                 
                          
     # 计算平均最大不利变动，平均最大有利变动，E比率
@@ -100,8 +101,8 @@ def evaluate_signal(asset_value, value, signal, position, period):
     max_drawndown = max(drowndown)
     
     # 计算年化收益，夏普比率(0.03)
-    annual_return = (value[-1]/value[0]) ** (243/test_trading_days) - 1
-    sharpe = (annual_return - 0.03) / np.std(value[1:] / value[:-1]) / np.sqrt(243)
+    annual_return = (strategy_value[-1]/strategy_value[0]) ** (243/test_trading_days) - 1
+    sharpe = (annual_return - 0.03) / np.std(strategy_value[1:] / strategy_value[:-1]) / np.sqrt(243)
     
     
     ## Report ##
